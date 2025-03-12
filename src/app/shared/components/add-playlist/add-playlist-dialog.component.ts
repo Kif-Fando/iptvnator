@@ -54,6 +54,7 @@ export class AddPlaylistDialogComponent {
      * @param payload
      */
     handlePlaylist(payload: { uploadEvent: Event; file: File }): void {
+        // this.isLoading = true;
         const playlist = (payload.uploadEvent.target as FileReader)
             .result as string;
 
@@ -62,7 +63,7 @@ export class AddPlaylistDialogComponent {
                 uploadType: 'FILE',
                 playlist,
                 title: payload.file.name,
-                path: (payload.file as any).path,
+                path: payload.file.path,
             })
         );
         this.closeDialog();
@@ -74,6 +75,7 @@ export class AddPlaylistDialogComponent {
                 filename,
             })
         );
+        // this.isLoading = false;
     }
 
     /**
@@ -81,6 +83,7 @@ export class AddPlaylistDialogComponent {
      * @param playlistUrl url of the added playlist
      */
     sendPlaylistsUrl(playlistUrl: string): void {
+        // this.isLoading = true;
         this.dataService.sendIpcEvent(PLAYLIST_PARSE_BY_URL, {
             title: getFilenameFromUrl(playlistUrl),
             url: playlistUrl,
@@ -93,6 +96,7 @@ export class AddPlaylistDialogComponent {
      * @param text playlist as string
      */
     uploadAsText(playlist: string): void {
+        // this.isLoading = true;
         this.store.dispatch(
             parsePlaylist({
                 uploadType: 'TEXT',

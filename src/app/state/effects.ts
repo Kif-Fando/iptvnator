@@ -5,8 +5,6 @@ import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { Store } from '@ngrx/store';
 import { StorageMap } from '@ngx-pwa/local-storage';
 import { TranslateService } from '@ngx-translate/core';
-import { isTauri } from '@tauri-apps/api/core';
-import Database from '@tauri-apps/plugin-sql';
 import {
     combineLatestWith,
     firstValueFrom,
@@ -21,7 +19,6 @@ import {
     OPEN_MPV_PLAYER,
     OPEN_VLC_PLAYER,
 } from '../../../shared/ipc-commands';
-import { Playlist } from '../../../shared/playlist.interface';
 import { DataService } from '../services/data.service';
 import { PlaylistsService } from '../services/playlists.service';
 import { Settings, VideoPlayer } from '../settings/settings.interface';
@@ -32,6 +29,7 @@ import {
     selectActivePlaylistId,
     selectChannels,
     selectFavorites,
+    selectIsEpgAvailable,
 } from './selectors';
 
 @Injectable({ providedIn: 'any' })
@@ -46,14 +44,7 @@ export class PlaylistEffects {
                 ),
                 switchMap(([, favorites, playlistId]) =>
                     this.playlistsService.updateFavorites(playlistId, favorites)
-                ),
-                tap(() => {
-                    this.snackBar.open(
-                        this.translate.instant('CHANNELS.FAVORITES_UPDATED'),
-                        null,
-                        { duration: 2000 }
-                    );
-                })
+                )
             );
         },
         { dispatch: false }
@@ -94,7 +85,6 @@ export class PlaylistEffects {
                                     url:
                                         activeChannel.url +
                                         (activeChannel.epgParams ?? ''),
-                                    mpvPlayerPath: settings?.mpvPlayerPath,
                                 });
                             else if (
                                 settings &&
@@ -105,7 +95,6 @@ export class PlaylistEffects {
                                     url:
                                         activeChannel.url +
                                         (activeChannel.epgParams ?? ''),
-                                    vlcPlayerPath: settings?.vlcPlayerPath,
                                 });
                         }
                     );
@@ -118,16 +107,18 @@ export class PlaylistEffects {
     setActiveChannel$ = createEffect(() => {
         return this.actions$.pipe(
             ofType(PlaylistActions.setActiveChannel),
-            map((action) => {
+            combineLatestWith(this.store.select(selectIsEpgAvailable)),
+            map(([action, isEpgAvailable]) => {
                 const { channel } = action;
-                this.dataService.sendIpcEvent(EPG_GET_PROGRAM, {
-                    channel,
-                });
+                if (isEpgAvailable) {
+                    this.dataService.sendIpcEvent(EPG_GET_PROGRAM, {
+                        channel,
+                    });
+                }
                 if (channel.http['user-agent']) {
                     this.dataService.sendIpcEvent(CHANNEL_SET_USER_AGENT, {
                         referer: channel.http.referrer,
                         userAgent: channel.http['user-agent'],
-                        origin: channel.http.origin,
                     });
                 }
 
@@ -141,10 +132,6 @@ export class PlaylistEffects {
                         ) {
                             this.dataService.sendIpcEvent(OPEN_MPV_PLAYER, {
                                 url: channel.url,
-                                mpvPlayerPath: settings?.mpvPlayerPath,
-                                referer: channel.http.referrer,
-                                userAgent: channel.http['user-agent'],
-                                origin: channel.http.origin,
                             });
                         } else if (
                             settings &&
@@ -154,7 +141,6 @@ export class PlaylistEffects {
                         )
                             this.dataService.sendIpcEvent(OPEN_VLC_PLAYER, {
                                 url: channel.url,
-                                vlcPlayerPath: settings?.vlcPlayerPath,
                             });
                     }
                 );
@@ -234,33 +220,13 @@ export class PlaylistEffects {
                 switchMap((action) =>
                     this.playlistsService.addPlaylist(action.playlist)
                 ),
-                map((playlist: Playlist) => {
-                    if (playlist.serverUrl && !isTauri()) {
+                tap((playlist) => {
+                    if (playlist.serverUrl) {
                         this.router.navigate(['/xtreams/', playlist._id]);
                     } else if (playlist.macAddress) {
                         this.router.navigate(['portals', playlist._id]);
                     } else {
                         this.router.navigate(['/playlists/', playlist._id]);
-                    }
-                    return playlist;
-                }),
-                map(async (playlist) => {
-                    if (playlist.serverUrl && isTauri()) {
-                        const db = await Database.load('sqlite:database.db');
-                        const result = await db.execute(
-                            `INSERT INTO playlists (id, name, serverUrl, username, password, type)
-                        VALUES (?, ?, ?, ?, ?, ?)`,
-                            [
-                                playlist._id.toString(),
-                                playlist.title || '',
-                                playlist.serverUrl || '',
-                                playlist.username || '',
-                                playlist.password || '',
-                                'xtream',
-                            ]
-                        );
-                        console.log('inserted item', result);
-                        this.router.navigate(['/xtreams/', playlist._id]);
                     }
                 })
             );
@@ -272,13 +238,9 @@ export class PlaylistEffects {
         () => {
             return this.actions$.pipe(
                 ofType(PlaylistActions.updatePlaylistMeta),
-                switchMap((action) => {
-                    // TODO update playlist in sqlite db
-
-                    return this.playlistsService.updatePlaylistMeta(
-                        action.playlist
-                    );
-                })
+                switchMap((action) =>
+                    this.playlistsService.updatePlaylistMeta(action.playlist)
+                )
             );
         },
         { dispatch: false }

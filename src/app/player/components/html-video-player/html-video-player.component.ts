@@ -4,7 +4,6 @@ import {
     Input,
     OnChanges,
     OnDestroy,
-    OnInit,
     SimpleChanges,
     ViewChild,
 } from '@angular/core';
@@ -23,11 +22,10 @@ import { DataService } from '../../../services/data.service';
     styleUrls: ['./html-video-player.component.scss'],
     standalone: true,
 })
-export class HtmlVideoPlayerComponent implements OnInit, OnChanges, OnDestroy {
+export class HtmlVideoPlayerComponent implements OnChanges, OnDestroy {
     /** Channel to play  */
     @Input() channel: Channel;
     dataService: DataService; // Declare the dataService property
-    @Input() volume = 1;
 
     constructor(dataService: DataService) {
         this.dataService = dataService; // Inject the DataService
@@ -43,12 +41,6 @@ export class HtmlVideoPlayerComponent implements OnInit, OnChanges, OnDestroy {
     /** Captions/subtitles indicator */
     @Input() showCaptions!: boolean;
 
-    ngOnInit() {
-        this.videoPlayer.nativeElement.addEventListener('volumechange', () => {
-            this.onVolumeChange();
-        });
-    }
-
     /**
      * Listen for component input changes
      * @param changes component changes
@@ -56,13 +48,6 @@ export class HtmlVideoPlayerComponent implements OnInit, OnChanges, OnDestroy {
     ngOnChanges(changes: SimpleChanges): void {
         if (changes.channel && changes.channel.currentValue) {
             this.playChannel(changes.channel.currentValue);
-        }
-        if (changes.volume?.currentValue !== undefined) {
-            console.log(
-                'Setting HTML5 player volume to:',
-                changes.volume.currentValue
-            );
-            this.videoPlayer.nativeElement.volume = changes.volume.currentValue;
         }
     }
 
@@ -75,62 +60,32 @@ export class HtmlVideoPlayerComponent implements OnInit, OnChanges, OnDestroy {
         if (channel.url) {
             const url = channel.url + (channel.epgParams ?? '');
             const extension = getExtensionFromUrl(channel.url);
+            this.dataService.sendIpcEvent(CHANNEL_SET_USER_AGENT, {
+                userAgent: channel.http?.['user-agent'] ?? '',
+                referer: channel.http?.referrer ?? '',
+            });
 
-            // Send IPC event and handle the response
-            this.dataService
-                .sendIpcEvent(CHANNEL_SET_USER_AGENT, {
-                    userAgent: channel.http?.['user-agent'] ?? '',
-                    referer: channel.http?.referrer ?? '',
-                    origin: channel.http?.origin ?? '',
-                })
-                .then(() => {
-                    if (
-                        extension !== 'mp4' &&
-                        extension !== 'mpv' &&
-                        Hls &&
-                        Hls.isSupported()
-                    ) {
-                        console.log(
-                            '... switching channel to ',
-                            channel.name,
-                            url
-                        );
-                        this.hls = new Hls();
-                        this.hls.attachMedia(this.videoPlayer.nativeElement);
-                        this.hls.loadSource(url);
-                        this.handlePlayOperation();
-                    } else {
-                        console.log('Using native video player...');
-                        this.addSourceToVideo(
-                            this.videoPlayer.nativeElement,
-                            url,
-                            'video/mp4'
-                        );
-                        this.videoPlayer.nativeElement.play();
-                    }
-                })
-                .catch((error) => {
-                    console.error('Error setting user agent:', error);
-                    // Continue playback even if setting user agent fails
-                    if (
-                        extension !== 'mp4' &&
-                        extension !== 'mpv' &&
-                        Hls &&
-                        Hls.isSupported()
-                    ) {
-                        this.hls = new Hls();
-                        this.hls.attachMedia(this.videoPlayer.nativeElement);
-                        this.hls.loadSource(url);
-                        this.handlePlayOperation();
-                    } else {
-                        this.addSourceToVideo(
-                            this.videoPlayer.nativeElement,
-                            url,
-                            'video/mp4'
-                        );
-                        this.videoPlayer.nativeElement.play();
-                    }
-                });
+            if (
+                extension !== 'mp4' &&
+                extension !== 'mpv' &&
+                Hls &&
+                Hls.isSupported()
+            ) {
+                console.log('... switching channel to ', channel.name, url);
+                this.hls = new Hls();
+                this.hls.attachMedia(this.videoPlayer.nativeElement);
+                this.hls.loadSource(url);
+
+                this.handlePlayOperation();
+            } else {
+                console.error('something wrong with hls.js init...');
+                this.addSourceToVideo(
+                    this.videoPlayer.nativeElement,
+                    url,
+                    'video/mp4'
+                );
+                this.videoPlayer.nativeElement.play();
+            }
         }
     }
 
@@ -173,22 +128,9 @@ export class HtmlVideoPlayerComponent implements OnInit, OnChanges, OnDestroy {
     }
 
     /**
-     * Save volume when user changes it
-     */
-    onVolumeChange(): void {
-        const currentVolume = this.videoPlayer.nativeElement.volume;
-        console.log('Volume changed to:', currentVolume);
-        localStorage.setItem('volume', currentVolume.toString());
-    }
-
-    /**
-     * Destroy hls instance on component destroy and clean up event listener
+     * Destroy hls instance on component destroy
      */
     ngOnDestroy(): void {
-        this.videoPlayer.nativeElement.removeEventListener(
-            'volumechange',
-            this.onVolumeChange
-        );
         if (this.hls) {
             this.hls.destroy();
         }

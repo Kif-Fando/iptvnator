@@ -1,7 +1,7 @@
 <div
     class="file-upload"
     appDragDropFileUpload
-    (click)="openDialog(fileField)"
+    (click)="fileField.click()"
     (fileDropped)="upload($event)"
 >
     <mat-icon class="upload-icon">upload_file</mat-icon>

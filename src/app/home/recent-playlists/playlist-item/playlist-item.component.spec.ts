@@ -5,7 +5,6 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { TranslateModule } from '@ngx-translate/core';
 import { MockModule } from 'ng-mocks';
 import { PlaylistItemComponent } from './playlist-item.component';
-import { DataService } from '../../../services/data.service';
 
 describe('PlaylistItemComponent', () => {
     let component: PlaylistItemComponent;
@@ -20,7 +19,6 @@ describe('PlaylistItemComponent', () => {
                 MockModule(MatTooltipModule),
                 MockModule(TranslateModule),
             ],
-            providers: [DataService],
         }).compileComponents();
     }));
 

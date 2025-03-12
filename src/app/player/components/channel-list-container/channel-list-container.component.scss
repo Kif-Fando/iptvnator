@@ -5,7 +5,7 @@
 }
 
 .scroll-viewport {
-    min-height: calc(100vh - 159px);
+    min-height: calc(100vh - 185px);
 }
 
 .search-panel {
@@ -21,11 +21,7 @@
 
 mat-nav-list {
     overflow: scroll;
-}
-
-#all-channels {
-    overflow: hidden;
-    max-height: calc(100vh - 167px);
+    max-height: calc(100vh - 193px);
 }
 
 ::ng-deep {
@@ -65,7 +61,7 @@ mat-nav-list {
 
 #groups-list,
 #favorites-list {
-    height: calc(100vh - 105px);
+    height: calc(100vh - 120px);
 }
 
 @media only screen and (max-width: 599px) {

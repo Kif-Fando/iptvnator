@@ -12,28 +12,16 @@ describe('EpgItemDescriptionComponent', () => {
 
     beforeEach(waitForAsync(() => {
         TestBed.configureTestingModule({
-            imports: [
-                EpgItemDescriptionComponent,
-                MockModule(MatDialogModule),
-                MockModule(TranslateModule),
-            ],
-            providers: [
-                {
-                    provide: MAT_DIALOG_DATA,
-                    useValue: {
-                        title: 'TV Show 1',
-                        desc: 'Highly interesting show about pets',
-                        category: 'Fun',
-                    } as unknown as EpgProgram,
-                },
-            ],
+            declarations: [EpgItemDescriptionComponent],
+            imports: [MockModule(MatDialogModule), MockModule(TranslateModule)],
+            providers: [{ provide: MAT_DIALOG_DATA, useValue: {} }],
         }).compileComponents();
     }));
 
     beforeEach(() => {
         fixture = TestBed.createComponent(EpgItemDescriptionComponent);
         component = fixture.componentInstance;
-        component.epgProgram = TestBed.inject(MAT_DIALOG_DATA);
+        component.epgProgram = {} as EpgProgram;
         fixture.detectChanges();
     });
 
@@ -42,26 +30,25 @@ describe('EpgItemDescriptionComponent', () => {
     });
 
     it('should render epg details in the dialog', () => {
+        component.epgProgram = {
+            title: [{ value: 'TV Show 1', lang: 'ru' }],
+            desc: [{ value: 'Highly interesting show about pets' }],
+            category: [{ value: 'Fun' }],
+        } as EpgProgram;
         fixture.detectChanges();
-        const titleElement = fixture.debugElement.query(
-            By.css('[data-test="title"]')
+        const title = fixture.debugElement.query(By.css('[data-test="title"]'));
+        expect(title.nativeNode.innerHTML).toContain(
+            component.epgProgram.title[0].value
         );
-        expect(titleElement.nativeElement.textContent.trim()).toContain(
-            'TV Show 1'
-        );
-
-        const categoryElement = fixture.debugElement.query(
+        const category = fixture.debugElement.query(
             By.css('[data-test="category"]')
         );
-        expect(categoryElement.nativeElement.textContent.trim()).toContain(
-            'Fun'
+        expect(category.nativeNode.innerHTML).toContain(
+            component.epgProgram.category[0].value
         );
-
-        const descElement = fixture.debugElement.query(
-            By.css('[data-test="desc"]')
-        );
-        expect(descElement.nativeElement.textContent.trim()).toContain(
-            'Highly interesting show about pets'
+        const desc = fixture.debugElement.query(By.css('[data-test="desc"]'));
+        expect(desc.nativeNode.innerHTML).toContain(
+            component.epgProgram.desc[0].value
         );
     });
 });

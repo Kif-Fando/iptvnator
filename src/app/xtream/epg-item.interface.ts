@@ -5,7 +5,6 @@ export interface EpgItem {
     lang: string;
     start: string;
     end: string;
-    stop: string;
     description: string;
     channel_id: string;
     start_timestamp: string;

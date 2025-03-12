@@ -1,6 +1,6 @@
 export interface EpgChannel {
     id: string;
-    name: string;
+    name: { lang: string; value: string }[];
     icon: string[];
     url: string[];
 }

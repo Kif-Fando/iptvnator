@@ -8,8 +8,7 @@ import {
     inject,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatIcon, MatIconModule } from '@angular/material/icon';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute } from '@angular/router';
 import { TranslateModule } from '@ngx-translate/core';
 import { XtreamVodDetails } from '../../../../shared/xtream-vod-details.interface';
@@ -21,15 +20,7 @@ import { SafePipe } from './safe.pipe';
     templateUrl: './vod-details.component.html',
     styleUrls: ['../detail-view.scss'],
     standalone: true,
-    imports: [
-        MatButtonModule,
-        MatIcon,
-        NgIf,
-        MatIconModule,
-        SafePipe,
-        TranslateModule,
-        MatProgressSpinnerModule,
-    ],
+    imports: [MatButtonModule, NgIf, MatIconModule, SafePipe, TranslateModule],
 })
 export class VodDetailsComponent implements OnInit {
     @Input({ required: true }) item: XtreamVodDetails;
@@ -43,7 +34,6 @@ export class VodDetailsComponent implements OnInit {
     private portalId = this.route.snapshot.paramMap.get('id');
 
     isFavorite = false;
-    isLoading = false;
 
     ngOnInit(): void {
         this.checkFavoriteStatus();

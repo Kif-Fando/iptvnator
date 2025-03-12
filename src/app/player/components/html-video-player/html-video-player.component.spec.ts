@@ -3,13 +3,12 @@ import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
 import { TranslatePipe } from '@ngx-translate/core';
 import { MockPipe } from 'ng-mocks';
 import { DataService } from '../../../services/data.service';
+import { ElectronServiceStub } from '../../../services/electron.service.stub';
 import { HtmlVideoPlayerComponent } from './html-video-player.component';
 
 describe('HtmlVideoPlayerComponent', () => {
     let component: HtmlVideoPlayerComponent;
     let fixture: ComponentFixture<HtmlVideoPlayerComponent>;
-    let dataService: DataService;
-
     const TEST_CHANNEL = {
         id: '1234',
         url: 'http://test.ts',
@@ -23,20 +22,17 @@ describe('HtmlVideoPlayerComponent', () => {
     };
 
     beforeEach(waitForAsync(() => {
-        const dataServiceMock = {
-            sendIpcEvent: jest.fn().mockResolvedValue(undefined),
-        };
-
         TestBed.configureTestingModule({
             declarations: [HtmlVideoPlayerComponent, MockPipe(TranslatePipe)],
-            providers: [{ provide: DataService, useValue: dataServiceMock }],
+            providers: [
+                { provide: DataService, useClass: ElectronServiceStub },
+            ],
         }).compileComponents();
     }));
 
     beforeEach(() => {
         fixture = TestBed.createComponent(HtmlVideoPlayerComponent);
         component = fixture.componentInstance;
-        dataService = TestBed.inject(DataService);
         fixture.detectChanges();
     });
 

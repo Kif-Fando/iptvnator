@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, inject, Inject } from '@angular/core';
+import { Component, Inject } from '@angular/core';
 import {
     FormControl,
     ReactiveFormsModule,
@@ -13,17 +13,14 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { Store } from '@ngrx/store';
 import { TranslateModule } from '@ngx-translate/core';
-import { isTauri } from '@tauri-apps/api/core';
 import { firstValueFrom } from 'rxjs';
 import { Playlist } from '../../../../../shared/playlist.interface';
-import { DatabaseService } from '../../../services/database.service';
+import { DataService } from '../../../services/data.service';
 import { PlaylistsService } from '../../../services/playlists.service';
 import { PlaylistMeta } from '../../../shared/playlist-meta.type';
 import * as PlaylistActions from '../../../state/actions';
-import { XtreamStore } from '../../../xtream-tauri/xtream.store';
 
 @Component({
     selector: 'app-playlist-info',
@@ -35,7 +32,7 @@ import { XtreamStore } from '../../../xtream-tauri/xtream.store';
             }
         `,
     ],
-    providers: [DatePipe, XtreamStore],
+    providers: [DatePipe],
     imports: [
         TranslateModule,
         MatButtonModule,
@@ -49,32 +46,30 @@ import { XtreamStore } from '../../../xtream-tauri/xtream.store';
     standalone: true,
 })
 export class PlaylistInfoComponent {
-    isTauri = isTauri();
+    /** Flag that returns true if application runs in electron-based environment */
+    isElectron = this.dataService.isElectron;
 
     /** Playlist object */
-    playlist: Playlist & { id: string };
+    playlist: Playlist;
 
     /** Form group with playlist details */
     playlistDetails: UntypedFormGroup;
-    xtreamStore = inject(XtreamStore);
 
     constructor(
         private datePipe: DatePipe,
         private formBuilder: UntypedFormBuilder,
-        private playlistsService: PlaylistsService,
-        @Inject(MAT_DIALOG_DATA) public playlistData: Playlist & { id: string },
-        private store: Store,
-        private databaseService: DatabaseService,
-        private snackBar: MatSnackBar
+        private dataService: DataService,
+        @Inject(MAT_DIALOG_DATA) playlist: Playlist,
+        private playlistService: PlaylistsService,
+        private store: Store
     ) {
-        this.playlist = playlistData;
-        this.createForm();
+        this.playlist = playlist;
     }
 
     /**
      * Create the form and set initial data on component init
      */
-    createForm(): void {
+    ngOnInit(): void {
         this.playlistDetails = this.formBuilder.group({
             _id: this.playlist._id,
             title: new FormControl(this.playlist.title, Validators.required),
@@ -108,58 +103,13 @@ export class PlaylistInfoComponent {
         });
     }
 
-    async saveChanges(playlist: PlaylistMeta): Promise<void> {
-        try {
-            // if xtream
-            if (
-                this.playlist &&
-                this.playlist.username &&
-                this.playlist.password &&
-                this.playlist.serverUrl
-            ) {
-                const success =
-                    await this.databaseService.updateXtreamPlaylistDetails({
-                        id: this.playlist._id,
-                        title: playlist.title,
-                        username: playlist.username,
-                        password: playlist.password,
-                        serverUrl: playlist.serverUrl,
-                    });
-
-                if (!success) {
-                    throw new Error('Failed to update playlist in database');
-                }
-
-                // Update the currentPlaylist in XtreamStore
-                this.xtreamStore.updatePlaylist({
-                    name: playlist.title,
-                    username: playlist.username,
-                    password: playlist.password,
-                    serverUrl: playlist.serverUrl,
-                });
-            }
-
-            // Dispatch store action to update UI
-            this.store.dispatch(
-                PlaylistActions.updatePlaylistMeta({ playlist })
-            );
-
-            this.snackBar.open(
-                'Playlist details updated successfully',
-                'Close',
-                { duration: 3000 }
-            );
-        } catch (error) {
-            console.error('Error updating playlist:', error);
-            this.snackBar.open('Error updating playlist details', 'Close', {
-                duration: 3000,
-            });
-        }
+    saveChanges(playlist: PlaylistMeta): void {
+        this.store.dispatch(PlaylistActions.updatePlaylistMeta({ playlist }));
     }
 
     async exportPlaylist() {
         const playlistAsString = await firstValueFrom(
-            this.playlistsService.getRawPlaylistById(this.playlist._id)
+            this.playlistService.getRawPlaylistById(this.playlist._id)
         );
         const element = document.createElement('a');
         element.setAttribute(

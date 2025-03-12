@@ -1,15 +1,16 @@
-import { CdkDragDrop, moveItemInArray } from '@angular/cdk/drag-drop';
+import {
+    CdkDragDrop,
+    DragDropModule,
+    moveItemInArray,
+} from '@angular/cdk/drag-drop';
 import { AsyncPipe, NgFor, NgIf } from '@angular/common';
 import {
     Component,
-    ElementRef,
     EventEmitter,
-    HostListener,
     Input,
     NgZone,
     OnDestroy,
     Output,
-    ViewChild,
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
@@ -27,8 +28,6 @@ import { GLOBAL_FAVORITES_PLAYLIST_ID } from '../../../../shared/constants';
 import { IpcCommand } from '../../../../shared/ipc-command.class';
 import { Playlist } from '../../../../shared/playlist.interface';
 import { DataService } from '../../services/data.service';
-import { DatabaseService } from '../../services/database.service';
-import { SortService } from '../../services/sort.service';
 import * as PlaylistActions from '../../state/actions';
 import {
     selectActiveTypeFilters,
@@ -38,7 +37,10 @@ import {
 import {
     AUTO_UPDATE_PLAYLISTS_RESPONSE,
     DELETE_ALL_PLAYLISTS,
+    IS_PLAYLISTS_MIGRATION_POSSIBLE,
+    IS_PLAYLISTS_MIGRATION_POSSIBLE_RESPONSE,
     MIGRATE_PLAYLISTS,
+    MIGRATE_PLAYLISTS_RESPONSE,
     PLAYLIST_UPDATE,
     PLAYLIST_UPDATE_RESPONSE,
 } from './../../../../shared/ipc-commands';
@@ -54,6 +56,7 @@ import { PlaylistItemComponent } from './playlist-item/playlist-item.component';
     styleUrls: ['./recent-playlists.component.scss'],
     imports: [
         AsyncPipe,
+        DragDropModule,
         MatButtonModule,
         MatDividerModule,
         MatIconModule,
@@ -67,18 +70,16 @@ import { PlaylistItemComponent } from './playlist-item/playlist-item.component';
     ],
 })
 export class RecentPlaylistsComponent implements OnDestroy {
-    @ViewChild('searchQuery') searchQueryInput!: ElementRef<HTMLInputElement>;
-
     searchQuery = new BehaviorSubject('');
 
     playlists$ = combineLatest([
         this.store.select(selectAllPlaylistsMeta),
         this.searchQuery,
+        // eslint-disable-next-line @ngrx/avoid-combining-selectors
         this.store.select(selectActiveTypeFilters),
-        this.sortService.getSortOptions(),
     ]).pipe(
-        map(([playlists, searchQuery, filters, sortOptions]) => {
-            const filteredPlaylists = playlists
+        map(([playlists, searchQuery, filters]) =>
+            playlists
                 .filter((item) => {
                     const isStalkerFilter =
                         item.macAddress && filters.includes('stalker');
@@ -102,14 +103,9 @@ export class RecentPlaylistsComponent implements OnDestroy {
                 })
                 .filter((item) =>
                     item.title.toLowerCase().includes(searchQuery.toLowerCase())
-                );
-
-            // Apply sorting using the SortService
-            return this.sortService.sortPlaylists(
-                filteredPlaylists,
-                sortOptions
-            );
-        })
+                )
+                .sort((a, b) => a.position - b.position)
+        )
     );
 
     allPlaylistsLoaded = this.store.selectSignal(selectPlaylistsLoadingFlag);
@@ -132,6 +128,28 @@ export class RecentPlaylistsComponent implements OnDestroy {
             }
         ),
         new IpcCommand(
+            IS_PLAYLISTS_MIGRATION_POSSIBLE_RESPONSE,
+            (response: { result: boolean; message: string }) => {
+                this.isMigrationPossible = response.result;
+                this.migrationMessage = response.message || '';
+            }
+        ),
+        new IpcCommand(
+            MIGRATE_PLAYLISTS_RESPONSE,
+            (response: { payload: Playlist[] }) => {
+                this.store.dispatch(
+                    PlaylistActions.addManyPlaylists({
+                        playlists: response.payload,
+                    })
+                );
+                this.snackBar.open(
+                    `${response.payload.length} playlists were successfully migrated`,
+                    null,
+                    { duration: 2000 }
+                );
+            }
+        ),
+        new IpcCommand(
             AUTO_UPDATE_PLAYLISTS_RESPONSE,
             (playlists: Playlist[]) => {
                 this.store.dispatch(
@@ -143,21 +161,25 @@ export class RecentPlaylistsComponent implements OnDestroy {
         ),
     ];
 
+    isMigrationPossible = false;
+    migrationMessage = '';
+
     constructor(
-        private readonly databaseService: DatabaseService,
-        private readonly dialog: MatDialog,
-        private readonly dialogService: DialogService,
-        private readonly electronService: DataService,
-        private readonly ngZone: NgZone,
-        private readonly router: Router,
-        private readonly snackBar: MatSnackBar,
-        private readonly sortService: SortService,
+        private dialog: MatDialog,
+        private dialogService: DialogService,
+        private electronService: DataService,
+        private ngZone: NgZone,
+        private router: Router,
+        private snackBar: MatSnackBar,
         private readonly store: Store,
-        private readonly translate: TranslateService
+        private translate: TranslateService
     ) {}
 
     ngOnInit(): void {
         this.setRendererListeners();
+        if (this.electronService.isElectron) {
+            this.electronService.sendIpcEvent(IS_PLAYLISTS_MIGRATION_POSSIBLE);
+        }
     }
 
     /**
@@ -233,8 +255,7 @@ export class RecentPlaylistsComponent implements OnDestroy {
      * Removes the provided playlist from the database
      * @param playlistId playlist id to remove
      */
-    removePlaylist(playlistId: string) {
-        this.databaseService.deletePlaylist(playlistId);
+    removePlaylist(playlistId: string): void {
         this.store.dispatch(PlaylistActions.removePlaylist({ playlistId }));
     }
 
@@ -275,14 +296,5 @@ export class RecentPlaylistsComponent implements OnDestroy {
 
     onSearchQueryUpdate(searchQuery: string) {
         this.searchQuery.next(searchQuery);
-    }
-
-    @HostListener('window:keydown.control.f', ['$event'])
-    @HostListener('window:keydown.meta.f', ['$event'])
-    onSearchHotkey(event: KeyboardEvent) {
-        // Prevent default browser search behavior
-        event.preventDefault();
-        event.stopPropagation();
-        this.searchQueryInput?.nativeElement?.focus();
     }
 }

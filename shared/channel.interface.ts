@@ -26,7 +26,6 @@ export interface Channel {
     http: {
         referrer: string;
         'user-agent': string;
-        origin: string;
     };
     radio: string;
 }

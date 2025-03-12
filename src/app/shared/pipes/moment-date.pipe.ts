@@ -6,7 +6,6 @@ import moment from 'moment';
  */
 @Pipe({
     name: 'momentDate',
-    standalone: true,
 })
 export class MomentDatePipe implements PipeTransform {
     transform(

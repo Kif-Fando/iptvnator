@@ -1,21 +1,38 @@
-import { defineConfig, devices } from '@playwright/test';
+import { devices, PlaywrightTestConfig } from '@playwright/test';
 
-export default defineConfig({
+const config: PlaywrightTestConfig = {
     testDir: './e2e',
     timeout: 45000,
     maxFailures: 2,
     testMatch: /.*\.e2e\.ts/,
-    webServer: {
-        command: 'npm run serve',
-        port: 4200,
-        reuseExistingServer: !process.env.CI,
-        timeout: 120000,
-    },
+    projects: [
+        {
+            name: 'chromium',
+            use: {
+                ...devices['Desktop Chrome'],
+                serviceWorkers: 'block',
+            },
+        },
+        /* {
+            name: 'firefox',
+            use: {
+                ...devices['Desktop Firefox'],
+                serviceWorkers: 'block',
+            },
+        },
+        {
+            name: 'webkit',
+            use: {
+                ...devices['Desktop Safari'],
+                serviceWorkers: 'block',
+            },
+        }, */
+    ],
     use: {
-        ...devices['Desktop Chrome'],
-        baseURL: 'http://localhost:4200',
         headless: false,
         screenshot: 'only-on-failure',
         testIdAttribute: 'data-test-id',
     },
-});
+};
+
+export default config;

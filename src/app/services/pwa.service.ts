@@ -1,11 +1,10 @@
 import { HttpClient } from '@angular/common/http';
-import { inject, Injectable } from '@angular/core';
+import { ApplicationRef, inject, Injectable } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Params } from '@angular/router';
 import { SwUpdate } from '@angular/service-worker';
 import { Store } from '@ngrx/store';
 import { TranslateService } from '@ngx-translate/core';
-import { catchError, firstValueFrom, throwError } from 'rxjs';
+import { catchError, EMPTY, throwError } from 'rxjs';
 import {
     ERROR,
     PLAYLIST_PARSE_BY_URL,
@@ -20,21 +19,23 @@ import { Playlist } from '../../../shared/playlist.interface';
 import { AppConfig } from '../../environments/environment';
 import * as PlaylistActions from '../state/actions';
 import { DataService } from './data.service';
+import { PlaylistsService } from './playlists.service';
 
 @Injectable({
     providedIn: 'root',
 })
 export class PwaService extends DataService {
-    private readonly http = inject(HttpClient);
-    private readonly snackBar = inject(MatSnackBar);
-    private readonly store = inject(Store);
-    private readonly swUpdate = inject(SwUpdate);
-    private readonly translateService = inject(TranslateService);
+    appRef = inject(ApplicationRef);
+    playlistService = inject(PlaylistsService);
+    snackBar = inject(MatSnackBar);
+    store = inject(Store);
+    swUpdate = inject(SwUpdate);
+    translateService = inject(TranslateService);
 
     /** Proxy URL to avoid CORS issues */
     corsProxyUrl = AppConfig.BACKEND_URL;
 
-    constructor() {
+    constructor(private http: HttpClient) {
         super();
         console.log('PWA service initialized...');
     }
@@ -63,13 +64,13 @@ export class PwaService extends DataService {
      * @param type ipc command type
      * @param payload payload
      */
-    sendIpcEvent(type: string, payload?: unknown) {
+    sendIpcEvent(type: string, payload?: unknown): void {
         if (type === PLAYLIST_PARSE_BY_URL) {
             this.fetchFromUrl(payload);
         } else if (type === PLAYLIST_UPDATE) {
             this.refreshPlaylist(payload);
         } else if (type === XTREAM_REQUEST) {
-            return this.forwardXtreamRequest(
+            this.forwardXtreamRequest(
                 payload as { url: string; params: Record<string, string> }
             );
         } else if (type === STALKER_REQUEST) {
@@ -151,7 +152,7 @@ export class PwaService extends DataService {
         return message;
     }
 
-    async forwardXtreamRequest(payload: {
+    forwardXtreamRequest(payload: {
         url: string;
         params: Record<string, string>;
         macAddress?: string;
@@ -163,44 +164,39 @@ export class PwaService extends DataService {
                   },
               }
             : {};
-        try {
-            let result: any;
-            const response = await firstValueFrom(
-                this.http.get(`${this.corsProxyUrl}/xtream`, {
-                    params: {
-                        url: payload.url,
-                        ...payload.params,
-                    },
-                    ...headers,
+        return this.http
+            .get(`${this.corsProxyUrl}/xtream`, {
+                params: {
+                    url: payload.url,
+                    ...payload.params,
+                },
+                ...headers,
+            })
+            .pipe(
+                catchError((response) => {
+                    window.postMessage({
+                        type: ERROR,
+                        status: response.error.status,
+                        message: response.error.message ?? 'Unknown error',
+                    });
+                    return EMPTY;
                 })
-            );
-
-            if (!(response as any).payload) {
-                if (payload.params.action === 'get_account_info') return;
-
-                result = {
-                    type: ERROR,
-                    status: (response as any).status,
-                    message: (response as any).message ?? 'Unknown error',
-                };
-                window.postMessage(result);
-            } else {
-                result = {
-                    type: XTREAM_RESPONSE,
-                    payload: (response as any).payload,
-                    action: payload.params.action,
-                };
-                window.postMessage(result);
-            }
-            return result;
-        } catch (error: any) {
-            if (payload.params.action === 'get_account_info') return;
-            window.postMessage({
-                type: ERROR,
-                status: error.error?.status,
-                message: error.error?.message ?? 'Unknown error',
+            )
+            .subscribe((response) => {
+                if (!(response as any).payload) {
+                    window.postMessage({
+                        type: ERROR,
+                        status: (response as any).status,
+                        message: (response as any).message ?? 'Unknown error',
+                    });
+                } else {
+                    window.postMessage({
+                        type: XTREAM_RESPONSE,
+                        payload: (response as any).payload,
+                        action: payload.params.action,
+                    });
+                }
             });
-        }
     }
 
     forwardStalkerRequest(payload: {
@@ -237,13 +233,5 @@ export class PwaService extends DataService {
 
     listenOn(_command: string, callback: (...args: any[]) => void): void {
         window.addEventListener('message', callback);
-    }
-
-    getAppEnvironment(): string {
-        return 'pwa';
-    }
-
-    fetchData(url: string, queryParams: Params) {
-        // not implemented
     }
 }

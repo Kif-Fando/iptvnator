@@ -12,5 +12,4 @@ export enum Language {
     FRENCH = 'fr',
     ITALIAN = 'it',
     TURKISH = 'tr',
-    JAPANESE = 'ja',
 }

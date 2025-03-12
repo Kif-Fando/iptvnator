@@ -74,7 +74,6 @@ describe('AppComponent', () => {
         // TODO: investigate in detail
         component.triggerAutoUpdateMechanism = jest.fn();
         component.modals = [];
-        component.checkForUpdates = jest.fn();
         fixture.detectChanges();
     });
 
@@ -220,7 +219,7 @@ describe('AppComponent', () => {
 
             expect(spyOnSettingsGet).toHaveBeenCalledWith(STORE_KEY.Settings);
             expect(settingsService.changeTheme).toHaveBeenCalledWith(theme);
-            expect(electronService.sendIpcEvent).toHaveBeenCalledTimes(1);
+            expect(electronService.sendIpcEvent).toHaveBeenCalledTimes(2);
             expect(translateService.use).toHaveBeenCalledWith(language);
         });
 
